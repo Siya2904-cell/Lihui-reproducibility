@@ -1,0 +1,104 @@
+---
+title: "Data Wrangling coding challenge 5"
+author: "lihui xiang"
+date: "2025-03-20"
+output:
+  pdf_document: default
+  github_document: default
+---
+
+
+###1.Download two .csv files from Canvas called DiversityData.csv and Metadata.csv, and read them into R using relative file paths.
+```{r}
+library(tidyverse)
+DiversityData <- read.csv("DiversityData.csv")
+Metadata <- read.csv("Metadata.csv")
+str(DiversityData)
+str(Metadata)
+```
+
+
+###2.Join the two dataframes together by the common column ‘Code’. Name the resulting dataframe alpha.
+```{r}
+alpha <- left_join(DiversityData, Metadata, by = "Code") ##as thses two data all have Code line and same lines number
+str(alpha)
+```
+
+###3.Calculate Pielou’s evenness index: Pielou’s evenness is an ecological parameter calculated by the Shannon diversity index (column Shannon) divided by the log of the richness column. 
+a.	Using mutate, create a new column to calculate Pielou’s evenness index. 
+b.	Name the resulting dataframe alpha_even.
+
+```{r}
+alpha_even <- alpha %>%
+  mutate(Pielou_evenness = shannon / log(richness)) ##calculate Pielou_evenness and save it to alpha_even
+head(alpha_even)
+```
+
+###4.Using tidyverse language of functions and the pipe, use the summarise function and tell me the mean and standard error evenness grouped by crop over time.
+a.	Start with the alpha_even dataframe
+b.	Group the data: group the data by Crop and Time_Point.
+c.	Summarize the data: Calculate the mean, count, standard deviation, and standard error for the even variable within each group.
+d.	Name the resulting dataframe alpha_average
+```{r}
+alpha_average <- alpha_even %>%  ###add the pipe %>% for multiple functions together
+  group_by(Crop, Time_Point) %>% ###group the data by Crop and Time_Point
+  summarise(
+    mean_evenness = mean(Pielou_evenness, na.rm = TRUE), ###Calculate the mean
+    count = n(), ###calculate count
+    sd_evenness = sd(Pielou_evenness, na.rm = TRUE), ###standard deviation
+    se_evenness = sd(Pielou_evenness, na.rm = TRUE) / sqrt(n()) ###standard error
+  )
+
+print(alpha_average)
+```
+
+###5.Calculate the difference between the soybean column, the soil column, and the difference between the cotton column and the soil column
+a.	Start with the alpha_average dataframe
+b.	Select relevant columns: select the columns Time_Point, Crop, and mean.even.
+c.	Reshape the data: Use the pivot_wider function to transform the data from long to wide format, creating new columns for each Crop with values from mean.even.
+d.	Calculate differences: Create new columns named diff.cotton.even and diff.soybean.even by calculating the difference between Soil and Cotton, and Soil and Soybean, respectively.
+e.	Name the resulting dataframe alpha_average2
+```{r}
+alpha_average2 <- alpha_average %>%
+  select(Time_Point, Crop, mean_evenness) %>% ###select the columns Time_Point, Crop, and mean.even.
+  pivot_wider(names_from = Crop, values_from = mean_evenness) %>%###transform the data from long to wide format
+  mutate(
+    diff.cotton.even = Soil - Cotton, ###calculate the difference between the cotton and soil 
+    diff.soybean.even = Soil - Soybean ###calculate the difference between the Soil and Soybean
+  )
+
+print(alpha_average2)
+```
+
+###6.Connecting it to plots
+a.	Start with the alpha_average2 dataframe
+b.	Select relevant columns: select the columns Time_Point, diff.cotton.even, and diff.soybean.even.
+c.	Reshape the data: Use the pivot_longer function to transform the data from wide to long format, creating a new column named diff that contains the values from diff.cotton.even and diff.soybean.even.
+i.	This might be challenging, so I’ll give you a break. The code is below.
+
+```{r}
+library(ggplot2)
+library(dplyr)
+alpha_long <- alpha_average2 %>%
+  select(Time_Point, diff.cotton.even, diff.soybean.even) %>% ###select the columns we want
+  pivot_longer(                                               ###transform the data from long to wide format
+    cols = c(diff.cotton.even, diff.soybean.even),            ###creating a new column named diff that contains the values from diff.cotton.even and diff.soybean.even.
+    names_to = "diff", 
+    values_to = "values" 
+  )
+
+print(alpha_long)
+```
+###Create the plot
+```{r}
+ggplot(alpha_long, aes(x = Time_Point, y = values, color = diff)) +
+  geom_line() +      ####add line plotr
+  labs(
+    title = "Difference in Evenness Over Time",
+    x = "Time Point",
+    y = "Difference in Evenness",
+    color = "Difference Type"
+  ) +
+  theme_minimal()
+```
+
